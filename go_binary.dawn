@@ -1,6 +1,6 @@
 load("//:go_sources.dawn", "go_sources")
 
-def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None):
+def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None, additional_sources=[]):
     (suffix, env) = ("", {})
     if goos:
         suffix = f"{suffix}_{goos}"
@@ -24,7 +24,9 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
 
     pkg_path = path(dir_label)
 
-    @target(name=name.replace("-", "_")+suffix, docs=docs, deps=deps, sources=go_sources(pkg_path))
+    sources = go_sources(pkg_path) + (additional_sources if additional_sources else [])
+
+    @target(name=name.replace("-", "_")+suffix, docs=docs, deps=deps, sources=sources)
     def binary():
         sh.exec(f"go {cmd} {gcflags} {ldflags} {pkg_path}", env=env)
 

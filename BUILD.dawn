@@ -1,0 +1,14 @@
+load(":go_sources.dawn", "go_sources")
+load(":go_binary.dawn", "go_binary")
+
+@target(generates=["generated.go"])
+def generate():
+	sh.exec('echo "package main" > generated.go')
+
+test = go_binary(name="test", dir_label="//", docs="Builds a test program", additional_sources=["generated.go"])
+
+@target(deps=[test])
+def default():
+	"""
+	Builds the test program
+	"""
