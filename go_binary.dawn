@@ -28,6 +28,6 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
 
     @target(name=name.replace("-", "_")+suffix, docs=docs, deps=deps, sources=sources)
     def binary():
-        sh.exec(f"go {cmd} {gcflags} {ldflags} {pkg_path}", env=env)
+        sh.exec(f"go {cmd} {gcflags} {ldflags} '{pkg_path}'", env=env)
 
     return binary
