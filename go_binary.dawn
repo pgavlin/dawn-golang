@@ -17,7 +17,7 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
         cmd = f"build -o {output}"
 
     if debug:
-        gcflags = f"{gcflags} all=-N -l"
+        gcflags = f"{gcflags} all=-N -l" if gcflags else "all=-N -l"
 
     gcflags = f"-gcflags=\"{gcflags}\"" if gcflags else ""
     ldflags = f"-ldflags=\"{ldflags}\"" if ldflags else ""
