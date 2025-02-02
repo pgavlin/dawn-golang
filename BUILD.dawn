@@ -7,7 +7,9 @@ def generate():
 
 test = go_binary(name="test", dir_label="//", docs="Builds a test program", additional_sources=["generated.go"])
 
-@target(deps=[test])
+test_bin = go_binary(name="test_bin", dir_label="//", docs="Builds a test program", additional_sources=["generated.go"], output="bin/output")
+
+@target(deps=[test, test_bin])
 def default():
 	"""
 	Builds the test program

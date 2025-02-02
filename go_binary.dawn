@@ -1,5 +1,9 @@
 load("//:go_sources.dawn", "go_sources")
 
+target_cache = Cache()
+def is_installed(pkg_path):
+    return target_cache.once(pkg_path, lambda: os.exists(sh.output("go list -f '{{.Target}}' " + f"'{pkg_path}'").strip()))
+
 def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None, additional_sources=[]):
     (suffix, env) = ("", {})
     if goos:
@@ -26,7 +30,11 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
 
     sources = go_sources(pkg_path) + (additional_sources if additional_sources else [])
 
-    @target(name=name.replace("-", "_")+suffix, docs=docs, deps=deps, sources=sources)
+    always = not output and not is_installed(pkg_path)
+
+    generates = [output] if output else None
+
+    @target(name=name.replace("-", "_")+suffix, docs=docs, deps=deps, sources=sources, always=always, generates=generates)
     def binary():
         sh.exec(f"go {cmd} {gcflags} {ldflags} '{pkg_path}'", env=env)
 
