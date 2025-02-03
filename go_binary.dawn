@@ -4,11 +4,48 @@ go_path = sh.output("go env GOPATH").strip()
 go_bin = sh.output("go env GOBIN").strip()
 go_bin = os.path.join(go_path, "bin") if not go_bin else go_bin
 
+def install_name(pkg):
+    """
+    Returns the name of the binary that will be installed by `go install` for the given package reference.
+
+    For example, given the package reference "github.com/pgavlin/dawn@v0.1.0", install_name returns "dawn".
+
+    :param pkg: a reference to the package.
+    """
+
+    (_, _, last) = pkg.rpartition("/")
+    (name, _, version) = last.rpartition("@")
+    return name or version # If there is no version, then version will contain the name.
+
 target_cache = Cache()
-def is_installed(pkg_path):
+def _is_installed(pkg_path):
+    """
+    Returns True if the package at the given path has been installed locally.
+
+    Not safe for general use due to problematic interactions between code that does not operate in 
+    module mode and `go list`.
+    """
+
     return target_cache.once(pkg_path, lambda: os.exists(sh.output("go list -f '{{.Target}}' " + f"'{pkg_path}'").strip()))
 
 def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None, additional_sources=[]):
+    """
+    Creates a target that `go install`s or `go build`s a binary.
+
+    :param name: the name of the target.
+    :param dir_label: the label of the directory that contains the binary's main package.
+    :param debug: True to run a debug build.
+    :param gcflags: additional gcflags to pass to the build.
+    :param ldflags: additional ldflags to pass to the build.
+    :param output: if set, `go build` the binary to the given path rather than `go installing` the binary.
+    :param docs: docs for the target.
+    :param deps: additional dependencies for the target.
+    :param goos: the GOOS for the build.
+    :param goarch: the GOARCH for the build.
+    :param disable_cgo: True to disable CGO.
+    :param additional_sources: additional sources that may not be discovered automatically. Typically used for generated sources that do not yet exist on the first build.
+    """
+
     (suffix, env) = ("", {})
     if goos:
         suffix = f"{suffix}_{goos}"
@@ -34,7 +71,7 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
 
     sources = go_sources(pkg_path) + (additional_sources if additional_sources else [])
 
-    always = not output and not is_installed(pkg_path)
+    always = not output and not _is_installed(pkg_path)
 
     generates = [output] if output else None
 
