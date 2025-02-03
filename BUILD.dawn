@@ -1,5 +1,5 @@
 load(":go_sources.dawn", "go_sources")
-load(":go_binary.dawn", "go_binary")
+load(":go_binary.dawn", "go_binary", "go_path", "go_bin")
 
 @target(generates=["generated.go"])
 def generate():
@@ -8,6 +8,8 @@ def generate():
 test = go_binary(name="test", dir_label="//", docs="Builds a test program", additional_sources=["generated.go"])
 
 test_bin = go_binary(name="test_bin", dir_label="//", docs="Builds a test program", additional_sources=["generated.go"], output="bin/output")
+
+print(f"{go_path} {go_bin}")
 
 @target(deps=[test, test_bin])
 def default():

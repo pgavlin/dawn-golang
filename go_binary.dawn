@@ -1,5 +1,9 @@
 load("//:go_sources.dawn", "go_sources")
 
+go_path = sh.output("go env GOPATH").strip()
+go_bin = sh.output("go env GOBIN").strip()
+go_bin = os.path.join(go_path, "bin") if not go_bin else go_bin
+
 target_cache = Cache()
 def is_installed(pkg_path):
     return target_cache.once(pkg_path, lambda: os.exists(sh.output("go list -f '{{.Target}}' " + f"'{pkg_path}'").strip()))
