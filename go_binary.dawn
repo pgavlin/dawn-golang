@@ -28,7 +28,7 @@ def _is_installed(pkg_path):
 
     return target_cache.once(pkg_path, lambda: os.exists(sh.output("go list -f '{{.Target}}' " + f"'{pkg_path}'").strip()))
 
-def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None, additional_sources=[]):
+def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None, additional_sources=[], always=False):
     """
     Creates a target that `go install`s or `go build`s a binary.
 
@@ -69,9 +69,9 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
 
     pkg_path = path(dir_label)
 
-    sources = go_sources(pkg_path) + (additional_sources if additional_sources else [])
+    sources = None if always else go_sources(pkg_path) + (additional_sources if additional_sources else [])
 
-    always = not output and not _is_installed(pkg_path)
+    always = always or not output and not _is_installed(pkg_path)
 
     generates = [output] if output else None
 
