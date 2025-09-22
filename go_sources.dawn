@@ -1,4 +1,5 @@
 cache = Cache()
+package_cache = Cache()
 
 def go_sources(package_dir=None):
     packages = {}
@@ -20,32 +21,35 @@ def go_sources(package_dir=None):
         if not ok:
             return
 
-        def add_files(kind):
-            if kind in p:
-                for path in p[kind]:
-                    if not os.path.is_abs(path):
-                        path = os.path.join(p["Dir"], path)
-                    (source, ok) = contains(path)
-                    if ok:
-                        sources.append(source)
+        def visit_package_dir():
+            def add_files(kind):
+                if kind in p:
+                    for path in p[kind]:
+                        if not os.path.is_abs(path):
+                            path = os.path.join(p["Dir"], path)
+                        (source, ok) = contains(path)
+                        if ok:
+                            sources.append(source)
 
-        add_files("GoFiles")
-        add_files("CgoFiles")
-        add_files("CompiledGoFiles")
-        add_files("CFiles")
-        add_files("CXXFiles")
-        add_files("MFiles")
-        add_files("HFiles")
-        add_files("FFiles")
-        add_files("SFiles")
-        add_files("SwigFiles")
-        add_files("SwigCXXFiles")
-        add_files("SysoFiles")
-        add_files("TestGoFiles")
-        add_files("XTestGoFiles")
-        add_files("EmbedFiles")
-        add_files("TestEmbedFiles")
-        add_files("XTestEmbedFiles")
+            add_files("GoFiles")
+            add_files("CgoFiles")
+            add_files("CompiledGoFiles")
+            add_files("CFiles")
+            add_files("CXXFiles")
+            add_files("MFiles")
+            add_files("HFiles")
+            add_files("FFiles")
+            add_files("SFiles")
+            add_files("SwigFiles")
+            add_files("SwigCXXFiles")
+            add_files("SysoFiles")
+            add_files("TestGoFiles")
+            add_files("XTestGoFiles")
+            add_files("EmbedFiles")
+            add_files("TestEmbedFiles")
+            add_files("XTestEmbedFiles")
+
+        package_cache.once(package_dir, visit_package_dir)
 
     def list_packages(root):
         return json.decode_all(sh.output("go list -json -test -deps ./...", cwd=root))

@@ -59,7 +59,8 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
 
     cmd = "install"
     if output:
-        cmd = f"build -o {output}"
+        output_path = path(label(output))
+        cmd = f"build -o {output_path}"
 
     if debug:
         gcflags = f"{gcflags} all=-N -l" if gcflags else "all=-N -l"
