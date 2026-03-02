@@ -1,6 +1,31 @@
 cache = Cache()
 package_cache = Cache()
 
+fields = ",".join([
+	"ImportPath",
+	"Imports",
+	"TestImports",
+	"XTestImports",
+	"Dir",
+	"GoFiles",
+	"CgoFiles",
+	"CompiledGoFiles",
+	"CFiles",
+	"CXXFiles",
+	"MFiles",
+	"HFiles",
+	"FFiles",
+	"SFiles",
+	"SwigFiles",
+	"SwigCXXFiles",
+	"SysoFiles",
+	"TestGoFiles",
+	"XTestGoFiles",
+	"EmbedFiles",
+	"TestEmbedFiles",
+	"XTestEmbedFiles",
+])
+
 def go_sources(package_dir=None):
     packages = {}
     visited = set()
@@ -52,7 +77,7 @@ def go_sources(package_dir=None):
         package_cache.once(package_dir, visit_package_dir)
 
     def list_packages(root):
-        return json.decode_all(sh.output("go list -json -test -deps ./...", cwd=root))
+        return json.decode_all(sh.output(f"go list -json={fields} -test -deps ./...", cwd=root))
 
     def find_sources(package_list):
         for p in package_list:
