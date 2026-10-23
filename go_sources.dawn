@@ -26,7 +26,20 @@ fields = ",".join([
 	"XTestEmbedFiles",
 ])
 
-def go_sources(package_dir=None):
+def go_sources(package_dir=None, tags=None, env=None):
+    """
+    Returns the project-local sources used to build the package tree rooted at package_dir.
+
+    :param package_dir: the directory of the root package.
+    :param tags: build tags to pass to `go list`.
+    :param env: build environment variables that affect `go list`.
+    """
+
+    tags = tags or []
+    env = env or {}
+    tags_flag = f"-tags='{','.join(tags)}'" if tags else ""
+    env_key = f"{[(key, env[key]) for key in sorted(env)]}"
+    cache_key = f"{env_key}|{tags_flag}"
     packages = {}
     visited = set()
     sources = []
@@ -46,7 +59,9 @@ def go_sources(package_dir=None):
         if not ok:
             return
 
-        def visit_package_dir():
+        def find_package_sources():
+            package_sources = []
+
             def add_files(kind):
                 if kind in p:
                     for path in p[kind]:
@@ -54,7 +69,7 @@ def go_sources(package_dir=None):
                             path = os.path.join(p["Dir"], path)
                         (source, ok) = contains(path)
                         if ok:
-                            sources.append(source)
+                            package_sources.append(source)
 
             add_files("GoFiles")
             add_files("CgoFiles")
@@ -73,11 +88,14 @@ def go_sources(package_dir=None):
             add_files("EmbedFiles")
             add_files("TestEmbedFiles")
             add_files("XTestEmbedFiles")
+            return package_sources
 
-        package_cache.once(package_dir, visit_package_dir)
+        package_sources = package_cache.once(f"{cache_key}|{package_dir}", find_package_sources)
+        for source in package_sources:
+            sources.append(source)
 
     def list_packages(root):
-        return json.decode_all(sh.output(f"go list -json={fields} -test -deps ./...", cwd=root))
+        return json.decode_all(sh.output(f"go list {tags_flag} -json={fields} -test -deps ./...", cwd=root, env=env))
 
     def find_sources(package_list):
         for p in package_list:
@@ -87,7 +105,7 @@ def go_sources(package_dir=None):
 
     package_dir = os.path.abs(package_dir or ".")
     def find_all_sources():
-        mod = json.decode(sh.output("go list -m -json", cwd=package_dir))
+        mod = json.decode(sh.output("go list -m -json", cwd=package_dir, env=env))
         if mod["Path"] != "command-line-arguments":
             (source, ok) = contains(mod["GoMod"])
             if ok:
@@ -96,4 +114,4 @@ def go_sources(package_dir=None):
         find_sources(list_packages(package_dir))
         return sources
 
-    return cache.once(package_dir, find_all_sources)
+    return cache.once(f"{cache_key}|{package_dir}", find_all_sources)

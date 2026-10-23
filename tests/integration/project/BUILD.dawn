@@ -1,0 +1,17 @@
+load("//:go_binary.dawn", "cgo_config", "go_binary", "go_config", "go_target")
+
+a = go_binary(name="a", dir_label="//go/cmd/a", output="go/bin/a")
+b = go_binary(name="b", dir_label="//go/cmd/b", output="go/bin/b")
+feature_default = go_binary(name="feature_default", dir_label="//go/cmd/feature", output="go/bin/feature-default")
+feature_special = go_binary(name="feature_special", dir_label="//go/cmd/feature", output="go/bin/feature-special", config=go_config(tags=["special"]))
+cgo = go_binary(name="cgo", dir_label="//go/cmd/cgo", output="go/bin/cgo", config=go_config(cgo=cgo_config(cflags="-DDAWN_CUSTOM_VALUE=42", ldflags="-lm")))
+stable = go_binary(name="stable", dir_label="//go/cmd/stable", output="go/bin/stable", config=go_config(flags=["-buildvcs=false"], goflags="-trimpath"))
+targeted = go_binary(name="targeted", dir_label="//go/cmd/stable", output="go/bin/targeted", config=go_config(target=go_target(os="linux", arch="amd64", variant="v1")))
+
+@target(name="downstream", sources=["go/bin/stable"], generates=["downstream.txt"])
+def downstream():
+    sh.exec("echo rebuilt >> downstream.txt")
+
+@target(deps=[a, b, feature_default, feature_special, cgo, stable, targeted, downstream])
+def default():
+    pass

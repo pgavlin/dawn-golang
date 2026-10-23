@@ -1,2 +1,5 @@
 name = "golang"
 version = "0.1.0"
+
+[dawn]
+version = "v0.3.4"

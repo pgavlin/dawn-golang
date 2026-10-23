@@ -1,0 +1,3 @@
+[dawn]
+buildfile = "BUILD.dawn"
+version = "v0.3.4"

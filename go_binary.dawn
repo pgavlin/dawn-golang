@@ -26,36 +26,167 @@ def _is_installed(pkg_path):
     module mode and `go list`.
     """
 
-    return target_cache.once(pkg_path, lambda: os.exists(sh.output("go list -f '{{.Target}}' " + f"'{pkg_path}'").strip()))
+    return target_cache.once(pkg_path, lambda: os.exists(sh.output("go list -f '{{.Target}}' .", cwd=pkg_path).strip()))
 
-def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None, additional_sources=[], always=False):
+def cgo_config(cflags=None, cppflags=None, cxxflags=None, fflags=None, ldflags=None):
+    """
+    Creates a CGO configuration for `go_binary`.
+
+    :param cflags: flags to pass to the C compiler through CGO_CFLAGS.
+    :param cppflags: flags to pass to the C/C++ preprocessor through CGO_CPPFLAGS.
+    :param cxxflags: flags to pass to the C++ compiler through CGO_CXXFLAGS.
+    :param fflags: flags to pass to the Fortran compiler through CGO_FFLAGS.
+    :param ldflags: flags to pass to the linker through CGO_LDFLAGS.
+    """
+
+    return struct(
+        cflags=cflags,
+        cppflags=cppflags,
+        cxxflags=cxxflags,
+        fflags=fflags,
+        ldflags=ldflags,
+    )
+
+def go_target(os=None, arch=None, variant=None):
+    """
+    Creates a Go target platform configuration for `go_config`.
+
+    :param os: the target operating system, passed through GOOS.
+    :param arch: the target architecture, passed through GOARCH.
+    :param variant: architecture-specific tuning passed through the environment variable associated with arch.
+    """
+
+    return struct(
+        os=os,
+        arch=arch,
+        variant=variant,
+    )
+
+def go_config(debug=None, gcflags=None, ldflags=None, target=None, disable_cgo=None, tags=None, flags=None, goflags=None, goexperiment=None, gotoolchain=None, gowork=None, cgo=None):
+    """
+    Creates a Go build configuration for `go_binary`.
+
+    :param debug: True to run a debug build.
+    :param gcflags: additional gcflags to pass to the build.
+    :param ldflags: additional ldflags to pass to the build.
+    :param target: a target platform configuration created by `go_target`.
+    :param disable_cgo: True to disable CGO.
+    :param tags: build tags to pass to both `go list` and the build.
+    :param flags: additional flags to pass verbatim to `go build` or `go install`.
+    :param goflags: flags to pass to Go commands through GOFLAGS.
+    :param goexperiment: toolchain experiments to enable or disable through GOEXPERIMENT.
+    :param gotoolchain: the Go toolchain selection through GOTOOLCHAIN.
+    :param gowork: the workspace file selection through GOWORK.
+    :param cgo: a CGO configuration created by `cgo_config`.
+    """
+
+    return struct(
+        debug=debug,
+        gcflags=gcflags,
+        ldflags=ldflags,
+        target=target,
+        disable_cgo=disable_cgo,
+        tags=tags,
+        flags=flags,
+        goflags=goflags,
+        goexperiment=goexperiment,
+        gotoolchain=gotoolchain,
+        gowork=gowork,
+        cgo=cgo,
+    )
+
+def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=None, docs=None, deps=None, goos=None, goarch=None, disable_cgo=None, additional_sources=[], always=False, config=None):
     """
     Creates a target that `go install`s or `go build`s a binary.
 
     :param name: the name of the target.
     :param dir_label: the label of the directory that contains the binary's main package.
-    :param debug: True to run a debug build.
-    :param gcflags: additional gcflags to pass to the build.
-    :param ldflags: additional ldflags to pass to the build.
+    :param debug: True to run a debug build. Prefer config for new callers.
+    :param gcflags: additional gcflags to pass to the build. Prefer config for new callers.
+    :param ldflags: additional ldflags to pass to the build. Prefer config for new callers.
     :param output: if set, `go build` the binary to the given path rather than `go installing` the binary.
     :param docs: docs for the target.
     :param deps: additional dependencies for the target.
-    :param goos: the GOOS for the build.
-    :param goarch: the GOARCH for the build.
-    :param disable_cgo: True to disable CGO.
+    :param goos: the GOOS for the build. Prefer config for new callers.
+    :param goarch: the GOARCH for the build. Prefer config for new callers.
+    :param disable_cgo: True to disable CGO. Prefer config for new callers.
     :param additional_sources: additional sources that may not be discovered automatically. Typically used for generated sources that do not yet exist on the first build.
+    :param always: True to always build the target.
+    :param config: a Go build configuration created by `go_config`.
     """
 
-    (suffix, env) = ("", {})
+    tags = []
+    flags = []
+    goflags = None
+    cgo = None
+    go_env = {}
+
+    if config:
+        debug = config.debug if config.debug != None else debug
+        gcflags = config.gcflags if config.gcflags != None else gcflags
+        ldflags = config.ldflags if config.ldflags != None else ldflags
+        if config.target:
+            goos = config.target.os if config.target.os != None else goos
+            goarch = config.target.arch if config.target.arch != None else goarch
+        disable_cgo = config.disable_cgo if config.disable_cgo != None else disable_cgo
+        tags = config.tags or []
+        flags = config.flags or []
+        goflags = config.goflags
+        cgo = config.cgo
+
+        go_settings = [
+            ("GOFLAGS", config.goflags),
+            ("GOEXPERIMENT", config.goexperiment),
+            ("GOTOOLCHAIN", config.gotoolchain),
+            ("GOWORK", config.gowork),
+        ]
+        for key, value in go_settings:
+            if value:
+                go_env[key] = value
+
+        if config.target and config.target.variant:
+            variant_variables = {
+                "386": "GO386",
+                "amd64": "GOAMD64",
+                "arm": "GOARM",
+                "arm64": "GOARM64",
+                "mips": "GOMIPS",
+                "mipsle": "GOMIPS",
+                "mips64": "GOMIPS64",
+                "mips64le": "GOMIPS64",
+                "ppc64": "GOPPC64",
+                "ppc64le": "GOPPC64",
+                "riscv64": "GORISCV64",
+                "wasm": "GOWASM",
+            }
+            if not goarch:
+                fail("go_target.variant requires go_target.arch")
+            if goarch not in variant_variables:
+                fail(f"go_target.variant is not supported for GOARCH={goarch}")
+            go_env[variant_variables[goarch]] = config.target.variant
+
+    (suffix, build_env) = ("", go_env)
     if goos:
         suffix = f"{suffix}_{goos}"
-        env["GOOS"] = goos
+        build_env["GOOS"] = goos
     if goarch:
         suffix = f"{suffix}_{goarch}"
-        env["GOARCH"] = goarch
+        build_env["GOARCH"] = goarch
 
     if disable_cgo:
-        env["CGO_ENABLED"] = 0
+        build_env["CGO_ENABLED"] = 0
+
+    if cgo:
+        if cgo.cflags:
+            build_env["CGO_CFLAGS"] = cgo.cflags
+        if cgo.cppflags:
+            build_env["CGO_CPPFLAGS"] = cgo.cppflags
+        if cgo.cxxflags:
+            build_env["CGO_CXXFLAGS"] = cgo.cxxflags
+        if cgo.fflags:
+            build_env["CGO_FFLAGS"] = cgo.fflags
+        if cgo.ldflags:
+            build_env["CGO_LDFLAGS"] = cgo.ldflags
 
     cmd = "install"
     if output:
@@ -70,14 +201,17 @@ def go_binary(name, dir_label, debug=False, gcflags=None, ldflags=None, output=N
 
     pkg_path = path(dir_label)
 
-    sources = None if always else go_sources(pkg_path) + (additional_sources if additional_sources else [])
+    sources = None if always else go_sources(pkg_path, tags=tags, env=build_env) + (additional_sources if additional_sources else [])
 
     always = always or not output and not _is_installed(pkg_path)
 
     generates = [output] if output else None
 
+    tags_flag = f"-tags='{','.join(tags)}'" if tags else ""
+    extra_flags = " ".join(flags)
+
     @target(name=name.replace("-", "_")+suffix, docs=docs, deps=deps, sources=sources, always=always, generates=generates)
     def binary():
-        sh.exec(f"go {cmd} {gcflags} {ldflags} '{pkg_path}'", env=env)
+        sh.exec(f"go {cmd} {tags_flag} {extra_flags} {gcflags} {ldflags} .", cwd=pkg_path, env=build_env)
 
     return binary
